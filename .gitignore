@@ -7,6 +7,8 @@ build/
 # ESP-IDF
 sdkconfig
 sdkconfig.old
+sdkconfig.esp32-c6-dev
+sdkconfig.seeed_xiao_esp32c6
 
 # CMake
 CMakeFiles/
