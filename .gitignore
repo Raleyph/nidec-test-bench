@@ -1,0 +1,22 @@
+# PlatformIO
+.pio/
+
+# Build
+build/
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# VSCode
+.vscode/
