@@ -13,12 +13,13 @@ namespace motor {
 using namespace config;
 
 esp_err_t HardwareDriver::initialize() {
-    const ledc_timer_config_t timer_config = {
+    const ledc_timer_config_t timer_config{
         .speed_mode = LEDC_MODE,
         .duty_resolution = LEDC_TIMER_BIT,
         .timer_num = LEDC_TIMER,
         .freq_hz = MIN_FREQ_HZ,
-        .clk_cfg = LEDC_AUTO_CLK
+        .clk_cfg = LEDC_AUTO_CLK,
+        .deconfigure = false,
     };
 
     esp_err_t err = ledc_timer_config(&timer_config);
@@ -27,15 +28,17 @@ esp_err_t HardwareDriver::initialize() {
         return err;
     }
 
-    const ledc_channel_config_t channel_config = {
+    const ledc_channel_config_t channel_config{
         .gpio_num = PFM_GPIO,
         .speed_mode = LEDC_MODE,
         .channel = LEDC_CHANNEL,
         .intr_type = LEDC_INTR_DISABLE,
         .timer_sel = LEDC_TIMER,
-
         .duty = 0,
-        .hpoint = 0
+        .hpoint = 0,
+        .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
+        .flags = {},
+        .deconfigure = false,
     };
 
     err = ledc_channel_config(&channel_config);
