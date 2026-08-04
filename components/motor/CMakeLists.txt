@@ -3,9 +3,11 @@ idf_component_register(
         "src/hardware_driver.cpp"
         "src/mock_driver.cpp"
         "src/motor_service.cpp"
+
     INCLUDE_DIRS
         "include"
+        
     REQUIRES
-        driver
-        esp_timer
+        esp_driver_gpio
+        esp_driver_ledc
 )
