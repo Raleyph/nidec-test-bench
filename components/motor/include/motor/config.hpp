@@ -24,10 +24,16 @@ constexpr std::uint16_t MAX_RPM = 2'700;
 constexpr std::uint16_t MIN_FREQ_HZ = 1'000;
 constexpr std::uint16_t MAX_FREQ_HZ = 18'000;
 
+constexpr std::uint16_t MAX_FREQ_STEP_HZ = 100;
+
 constexpr float RPM_TO_FREQ_RATE = static_cast<float>(MIN_RPM / MIN_FREQ_HZ);
 
 constexpr std::uint32_t RAMP_STEP_HZ = 100;
 constexpr std::uint32_t RAMP_DELAY_MS = 20;
+
+// Command Queue
+
+constexpr std::size_t COMMAND_QUEUE_LENGTH = 8;
 
 // LEDC
 
