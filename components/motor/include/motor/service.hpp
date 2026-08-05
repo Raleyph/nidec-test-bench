@@ -7,6 +7,7 @@
 #include "esp_err.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "motor/types.hpp"
 #include "motor/driver.hpp"
@@ -42,7 +43,7 @@ private:
 
     void enter_fault(esp_err_t error);
 
-    [[nodiscard]] static std::uint32_t rpm_to_frequency(std::uint16_t rpm);
+    [[nodiscard]] static std::uint32_t rpm_to_frequency(std::uint16_t rpm) noexcept;
 
 private:
     bool initialized_{false};

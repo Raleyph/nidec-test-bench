@@ -3,11 +3,16 @@
 #include <algorithm>
 #include <cmath>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "esp_log.h"
 
 #include "motor/config.hpp"
 #include "motor/service.hpp"
+
+namespace {
+
+constexpr char TAG[] = "motor_service";
+
+}
 
 namespace motor
 {
@@ -22,16 +27,24 @@ esp_err_t MotorService::start_task() {
         return ESP_ERR_INVALID_STATE;
     }
 
+    TaskHandle_t handle = nullptr;
+
     const BaseType_t result = xTaskCreate(
         &MotorService::task_entry,
         "motor_service",
         4096,
         this,
         5,
-        &task_handle_
+        &handle
     );
 
-    return result == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    if (result != pdPASS) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    task_handle_ = handle;
+
+    return ESP_OK;
 }
 
 esp_err_t MotorService::initialize() {
@@ -39,7 +52,17 @@ esp_err_t MotorService::initialize() {
         return ESP_ERR_INVALID_STATE;
     }
 
+    // initializing the driver
+
     esp_err_t err = driver_.initialize();
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // setting operational direction
+
+    err = driver_.set_direction(Direction::Clockwise);
 
     if (err != ESP_OK) {
         return err;
@@ -56,6 +79,10 @@ esp_err_t MotorService::initialize() {
 
 esp_err_t MotorService::start()
 {
+    if (!initialized_ || task_handle_ == nullptr) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     switch (state_.status) {
         case MotorStatus::Disabled:
             state_.status = MotorStatus::Starting;
@@ -75,6 +102,10 @@ esp_err_t MotorService::start()
 }
 
 esp_err_t MotorService::stop() {
+    if (!initialized_ || task_handle_ == nullptr) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     switch (state_.status) {
         case MotorStatus::Disabled:
             return ESP_OK;
@@ -93,8 +124,8 @@ esp_err_t MotorService::stop() {
 }
 
 esp_err_t MotorService::set_speed(std::uint16_t rpm) {
-    if (rpm < MIN_RPM || rpm > MAX_RPM) {
-        return ESP_ERR_INVALID_ARG;
+    if (!initialized_ || task_handle_ == nullptr) {
+        return ESP_ERR_INVALID_STATE;
     }
 
     if (
@@ -102,6 +133,12 @@ esp_err_t MotorService::set_speed(std::uint16_t rpm) {
         state_.status == MotorStatus::Fault
     ) {
         return ESP_ERR_INVALID_STATE;
+    }
+
+    // validating RPM
+
+    if (rpm < MIN_RPM || rpm > MAX_RPM) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     // calculating and validating frequency
@@ -135,6 +172,8 @@ void MotorService::task_entry(void * arg) {
 }
 
 void MotorService::run() {
+    TickType_t last_wake_time = xTaskGetTickCount();
+
     while (true) {
         const esp_err_t err = process();
 
@@ -142,7 +181,10 @@ void MotorService::run() {
             enter_fault(err);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(RAMP_DELAY_MS));
+        vTaskDelayUntil(
+            &last_wake_time,
+            pdMS_TO_TICKS(RAMP_DELAY_MS)
+        );
     }
 }
 
@@ -206,17 +248,9 @@ esp_err_t MotorService::process() {
 
 esp_err_t MotorService::process_start() {
 
-    // setting operational direction
-
-    esp_err_t err = driver_.set_direction(Direction::Clockwise);
-
-    if (err != ESP_OK) {
-        return err;
-    }
-
     // setting min frequency
 
-    err = driver_.set_frequency(MIN_FREQ_HZ);
+    esp_err_t err = driver_.set_frequency(MIN_FREQ_HZ);
 
     if (err != ESP_OK) {
         return err;
@@ -320,10 +354,22 @@ void MotorService::enter_fault(const esp_err_t error)
 
     if (pfm_err == ESP_OK) {
         state_.pfm_enabled = false;
+    } else {
+        ESP_LOGE(
+            TAG,
+            "Failed to disable PFM during fault handling: %s",
+            esp_err_to_name(pfm_err)
+        );
     }
 
     if (motor_err == ESP_OK) {
         state_.motor_enabled = false;
+    } else {
+        ESP_LOGE(
+            TAG,
+            "Failed to disable motor during fault handling: %s",
+            esp_err_to_name(motor_err)
+        );
     }
 
     state_.last_error = error;
@@ -333,9 +379,9 @@ void MotorService::enter_fault(const esp_err_t error)
 //////////////////////////////////////////////////////////////////////////
 // Calculations
 
-std::uint32_t MotorService::rpm_to_frequency(std::uint16_t rpm) {
+std::uint32_t MotorService::rpm_to_frequency(std::uint16_t rpm) noexcept {
     return static_cast<std::uint32_t>(
-        std::lround(rpm * RPM_TO_FREQ_RATE)
+        std::lround(static_cast<float>(rpm) * RPM_TO_FREQ_RATE)
     );
 }
 
