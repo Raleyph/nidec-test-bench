@@ -47,6 +47,8 @@ esp_err_t HardwareDriver::initialize() {
         return err;
     }
 
+    applied_freq_hz_ = MIN_FREQ_HZ;
+
     return ESP_OK;
 }
 
