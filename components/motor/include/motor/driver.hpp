@@ -34,6 +34,9 @@ public:
     esp_err_t set_pfm_enabled(bool enabled);
     esp_err_t set_direction(Direction direction) override;
     esp_err_t set_frequency(std::uint16_t freq_hz);
+
+private:
+    std::uint32_t applied_freq_hz_{0};
 };
 
 //////////////////////////////////////////////////////////////////////////

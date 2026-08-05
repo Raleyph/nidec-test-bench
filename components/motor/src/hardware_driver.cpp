@@ -88,11 +88,17 @@ esp_err_t HardwareDriver::set_frequency(std::uint16_t freq_hz) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (freq_hz > applied_freq_hz_ + MAX_FREQ_STEP_HZ) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     const esp_err_t err = ledc_set_freq(LEDC_MODE, LEDC_TIMER, freq_hz);
 
     if (err != ESP_OK) {
         return err;
     }
+
+    applied_freq_hz_ = freq_hz;
 
     return ESP_OK;
 }
