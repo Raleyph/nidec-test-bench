@@ -31,6 +31,10 @@ constexpr float RPM_TO_FREQ_RATE = static_cast<float>(MIN_RPM / MIN_FREQ_HZ);
 constexpr std::uint32_t RAMP_STEP_HZ = 100;
 constexpr std::uint32_t RAMP_DELAY_MS = 20;
 
+// Command Queue
+
+constexpr std::size_t COMMAND_QUEUE_LENGTH = 8;
+
 // LEDC
 
 constexpr ledc_mode_t LEDC_MODE = LEDC_LOW_SPEED_MODE;

@@ -52,6 +52,14 @@ esp_err_t MotorService::initialize() {
         return ESP_ERR_INVALID_STATE;
     }
 
+    // creating the command queue
+
+    command_queue_ = xQueueCreate(COMMAND_QUEUE_LENGTH, sizeof(Command));
+
+    if (command_queue_ == nullptr) {
+        return ESP_ERR_NO_MEM;
+    }
+
     // initializing the driver
 
     esp_err_t err = driver_.initialize();
@@ -79,88 +87,38 @@ esp_err_t MotorService::initialize() {
 
 esp_err_t MotorService::start()
 {
-    if (!initialized_ || task_handle_ == nullptr) {
+    if (!ready()) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    switch (state_.status) {
-        case MotorStatus::Disabled:
-            state_.status = MotorStatus::Starting;
-            return ESP_OK;
-
-        case MotorStatus::Starting:
-        case MotorStatus::Running:
-        case MotorStatus::Ramping:
-            return ESP_OK;
-
-        case MotorStatus::Stopping:
-        case MotorStatus::Fault:
-            return ESP_ERR_INVALID_STATE;
-    }
-
-    return ESP_ERR_INVALID_STATE;
+    return enqueue(Command{
+        .type = CommandType::Start,
+    });
 }
 
 esp_err_t MotorService::stop() {
-    if (!initialized_ || task_handle_ == nullptr) {
+    if (!ready()) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    switch (state_.status) {
-        case MotorStatus::Disabled:
-            return ESP_OK;
-
-        case MotorStatus::Fault:
-            return ESP_ERR_INVALID_STATE;
-
-        case MotorStatus::Stopping:
-            return ESP_OK;
-
-        default:
-            state_.target_freq_hz = MIN_FREQ_HZ;
-            state_.status = MotorStatus::Stopping;
-            return ESP_OK;
-    }
+    return enqueue(Command{
+        .type = CommandType::Stop,
+    });
 }
 
 esp_err_t MotorService::set_speed(std::uint16_t rpm) {
-    if (!initialized_ || task_handle_ == nullptr) {
+    if (!ready()) {
         return ESP_ERR_INVALID_STATE;
     }
-
-    if (
-        state_.status == MotorStatus::Stopping ||
-        state_.status == MotorStatus::Fault
-    ) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    // validating RPM
 
     if (rpm < MIN_RPM || rpm > MAX_RPM) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    // calculating and validating frequency
-
-    const std::uint32_t target_freq_hz = rpm_to_frequency(rpm);
-
-    if (
-        target_freq_hz < MIN_FREQ_HZ ||
-        target_freq_hz > MAX_FREQ_HZ
-    ) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    // setting target frequency and state
-
-    state_.target_freq_hz = target_freq_hz;
-
-    if (state_.status == MotorStatus::Running) {
-        state_.status = MotorStatus::Ramping;
-    }
-
-    return ESP_OK;
+    return enqueue(Command{
+        .type = CommandType::SetSpeed,
+        .rpm = rpm,
+    });
 }
 
 MotorState MotorService::state() const {
@@ -179,7 +137,9 @@ void MotorService::run() {
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (true) {
-        const esp_err_t err = process();
+        pull_commands();
+
+        const esp_err_t err = process_state();
 
         if (err != ESP_OK) {
             enter_fault(err);
@@ -192,37 +152,134 @@ void MotorService::run() {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////
-// Ramp Implementation
-
-esp_err_t MotorService::update_ramp()
+void MotorService::enter_fault(const esp_err_t error)
 {
-    const std::uint32_t current = state_.current_freq_hz;
-    const std::uint32_t target = state_.target_freq_hz;
+    const esp_err_t pfm_err = driver_.set_pfm_enabled(false);
+    const esp_err_t motor_err = driver_.set_enabled(false);
 
-    if (current == target) {
-        return ESP_OK;
-    }
-
-    // calculating next frequency
-
-    std::uint32_t next_freq_hz{};
-
-    if (current < target) {
-        next_freq_hz = current + std::min(target - current, RAMP_STEP_HZ);
+    if (pfm_err == ESP_OK) {
+        state_.pfm_enabled = false;
     } else {
-        next_freq_hz = current - std::min(current - target, RAMP_STEP_HZ);
+        ESP_LOGE(
+            TAG,
+            "Failed to disable PFM during fault handling: %s",
+            esp_err_to_name(pfm_err)
+        );
     }
 
-    // setting next frequency
-
-    const esp_err_t err = driver_.set_frequency(next_freq_hz);
-
-    if (err != ESP_OK) {
-        return err;
+    if (motor_err == ESP_OK) {
+        state_.motor_enabled = false;
+    } else {
+        ESP_LOGE(
+            TAG,
+            "Failed to disable motor during fault handling: %s",
+            esp_err_to_name(motor_err)
+        );
     }
 
-    state_.current_freq_hz = next_freq_hz;
+    state_.last_error = error;
+    state_.status = MotorStatus::Fault;
+}
+
+esp_err_t MotorService::enqueue(const Command& command) {
+    return xQueueSend(command_queue_, &command, 0) == pdTRUE
+        ? ESP_OK
+        : ESP_ERR_TIMEOUT;
+}
+
+void MotorService::pull_commands() {
+    Command command{};
+
+    while (xQueueReceive(command_queue_, &command, 0) == pdTRUE) {
+        const esp_err_t err = handle_command(command);
+
+        if (err != ESP_OK) {
+            ESP_LOGW(
+                TAG,
+                "Command rejected: %s",
+                esp_err_to_name(err)
+            );
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Command Handling
+
+esp_err_t MotorService::handle_command(const Command& command) {
+    switch (command.type) {
+        case CommandType::Start:
+            return handle_start_command();
+        
+        case CommandType::Stop:
+            return handle_stop_command();
+        
+        case CommandType::SetSpeed:
+            return handle_set_speed_command(command.rpm);
+    }
+
+    return ESP_ERR_INVALID_ARG;
+}
+
+esp_err_t MotorService::handle_start_command() {
+    switch (state_.status) {
+        case MotorStatus::Disabled:
+            state_.status = MotorStatus::Starting;
+            return ESP_OK;
+
+        case MotorStatus::Starting:
+        case MotorStatus::Running:
+        case MotorStatus::Ramping:
+            return ESP_OK;
+
+        case MotorStatus::Stopping:
+        case MotorStatus::Fault:
+            return ESP_ERR_INVALID_STATE;
+    }
+
+    return ESP_ERR_INVALID_STATE;
+}
+
+esp_err_t MotorService::handle_stop_command() {
+    switch (state_.status) {
+        case MotorStatus::Disabled:
+        case MotorStatus::Stopping:
+            return ESP_OK;
+
+        case MotorStatus::Fault:
+            return ESP_ERR_INVALID_STATE;
+
+        case MotorStatus::Starting:
+        case MotorStatus::Running:
+        case MotorStatus::Ramping:
+            state_.target_freq_hz = MIN_FREQ_HZ;
+            state_.status = MotorStatus::Stopping;
+            return ESP_OK;
+    }
+
+    return ESP_ERR_INVALID_STATE;
+}
+
+esp_err_t MotorService::handle_set_speed_command(const std::uint16_t rpm) {
+    if (rpm < MIN_RPM || rpm > MAX_RPM) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (state_.status == MotorStatus::Stopping || state_.status == MotorStatus::Fault) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    const std::uint32_t target_freq_hz = rpm_to_frequency(rpm);
+
+    if (target_freq_hz < MIN_FREQ_HZ || target_freq_hz > MAX_FREQ_HZ) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    state_.target_freq_hz = target_freq_hz;
+
+    if (state_.status == MotorStatus::Running) {
+        state_.status = MotorStatus::Ramping;
+    }
 
     return ESP_OK;
 }
@@ -230,7 +287,7 @@ esp_err_t MotorService::update_ramp()
 //////////////////////////////////////////////////////////////////////////
 // Command Processing
 
-esp_err_t MotorService::process() {
+esp_err_t MotorService::process_state() {
     switch(state_.status) {
         case MotorStatus::Disabled:
         case MotorStatus::Fault:
@@ -348,40 +405,44 @@ esp_err_t MotorService::process_running() {
     return ESP_OK;
 }
 
-//////////////////////////////////////////////////////////////////////////
-// Faults Handling
-
-void MotorService::enter_fault(const esp_err_t error)
+esp_err_t MotorService::update_ramp()
 {
-    const esp_err_t pfm_err = driver_.set_pfm_enabled(false);
-    const esp_err_t motor_err = driver_.set_enabled(false);
+    const std::uint32_t current = state_.current_freq_hz;
+    const std::uint32_t target = state_.target_freq_hz;
 
-    if (pfm_err == ESP_OK) {
-        state_.pfm_enabled = false;
-    } else {
-        ESP_LOGE(
-            TAG,
-            "Failed to disable PFM during fault handling: %s",
-            esp_err_to_name(pfm_err)
-        );
+    if (current == target) {
+        return ESP_OK;
     }
 
-    if (motor_err == ESP_OK) {
-        state_.motor_enabled = false;
+    // calculating next frequency
+
+    std::uint32_t next_freq_hz{};
+
+    if (current < target) {
+        next_freq_hz = current + std::min(target - current, RAMP_STEP_HZ);
     } else {
-        ESP_LOGE(
-            TAG,
-            "Failed to disable motor during fault handling: %s",
-            esp_err_to_name(motor_err)
-        );
+        next_freq_hz = current - std::min(current - target, RAMP_STEP_HZ);
     }
 
-    state_.last_error = error;
-    state_.status = MotorStatus::Fault;
+    // setting next frequency
+
+    const esp_err_t err = driver_.set_frequency(next_freq_hz);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    state_.current_freq_hz = next_freq_hz;
+
+    return ESP_OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
-// Calculations
+// Helpers
+
+bool MotorService::ready() const noexcept {
+    return initialized_ && task_handle_ != nullptr && command_queue_ != nullptr;
+}
 
 std::uint32_t MotorService::rpm_to_frequency(std::uint16_t rpm) noexcept {
     return static_cast<std::uint32_t>(
