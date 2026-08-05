@@ -163,6 +163,10 @@ esp_err_t MotorService::set_speed(std::uint16_t rpm) {
     return ESP_OK;
 }
 
+MotorState MotorService::state() const {
+    return state_;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Entrypoint
 

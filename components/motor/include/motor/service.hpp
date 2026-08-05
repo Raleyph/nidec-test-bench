@@ -27,6 +27,8 @@ public:
 
     esp_err_t set_speed(std::uint16_t rpm);
 
+    [[nodiscard]] MotorState state() const;
+
 private:
     static void task_entry(void* arg);
 
