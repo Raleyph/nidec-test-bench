@@ -1,0 +1,10 @@
+# Mosquitto
+mosquitto/data/
+mosquitto/log/
+mosquitto/config/passwords
+
+# Home Assistant
+homeassistant/
+
+# Docker
+.env
