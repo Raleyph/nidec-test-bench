@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "name": "Firmware",
+      "path": "firmware"
+    },
+    {
+      "name": "Docker",
+      "path": "nidec-docker"
+    }
+  ]
+}
