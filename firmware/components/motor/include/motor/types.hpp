@@ -34,7 +34,7 @@ struct MotorState {
     std::uint16_t current_freq_hz{0};
     std::uint16_t target_freq_hz{0};
 
-    esp_err_t last_error;
+    esp_err_t last_error{ESP_OK};
 };
 
 } // namespace motor

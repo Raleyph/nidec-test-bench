@@ -63,8 +63,6 @@ void event_handler(
 
 namespace wifi
 {
-
-ConnectedCallback on_connected_callback;
     
 esp_err_t initialize(ConnectedCallback on_connected, void* arg) {
     connected_callback = on_connected;
