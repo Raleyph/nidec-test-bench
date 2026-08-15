@@ -10,6 +10,8 @@ sdkconfig.old
 sdkconfig.esp32-c6-dev
 sdkconfig.seeed_xiao_esp32c6
 
+managed_components/
+
 # CMake
 CMakeFiles/
 CMakeCache.txt
