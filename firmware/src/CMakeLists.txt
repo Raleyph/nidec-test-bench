@@ -3,6 +3,6 @@ idf_component_register(
 
     REQUIRES
         wifi
-        mqtt
+        mqtt_service
         motor
 )

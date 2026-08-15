@@ -8,16 +8,15 @@ namespace {
 
 void on_wifi_connected(void* arg) {
     auto* mqtt_service = static_cast<mqtt::MqttService*>(arg);
-
     mqtt_service->start();
 }
 
 }
 
 extern "C" void app_main() {
-    motor::HardwareDriver motor{};
-    motor::MotorService motor_service{motor};
-    mqtt::MqttService mqtt_service{motor_service};
+    static motor::HardwareDriver motor{};
+    static motor::MotorService motor_service{motor};
+    static mqtt::MqttService mqtt_service{motor_service};
 
     ESP_ERROR_CHECK(motor_service.initialize());
     ESP_ERROR_CHECK(motor_service.start_task());

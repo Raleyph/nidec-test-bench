@@ -446,7 +446,7 @@ bool MotorService::ready() const noexcept {
 
 std::uint32_t MotorService::rpm_to_frequency(std::uint16_t rpm) noexcept {
     return static_cast<std::uint32_t>(
-        std::lround(static_cast<float>(rpm) * RPM_TO_FREQ_RATE)
+        std::lround(static_cast<float>(rpm) * FREQ_PER_RPM)
     );
 }
 
