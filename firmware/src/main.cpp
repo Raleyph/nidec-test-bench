@@ -1,5 +1,8 @@
 // © 2026 Raleyph
 
+#include "esp_err.h"
+#include "esp_log.h"
+
 #include "motor/service.hpp"
 #include "network/wifi.hpp"
 #include "mqtt/service.hpp"
@@ -8,7 +11,16 @@ namespace {
 
 void on_wifi_connected(void* arg) {
     auto* mqtt_service = static_cast<mqtt::MqttService*>(arg);
-    mqtt_service->start();
+    
+    const esp_err_t err = mqtt_service->start();
+
+    if (err != ESP_OK) {
+        ESP_LOGE(
+            "main",
+            "Failed to start MQTT: %s",
+            esp_err_to_name(err)
+        );
+    }
 }
 
 }

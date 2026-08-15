@@ -33,6 +33,10 @@ esp_err_t MqttService::initialize() {
 
     client_ = esp_mqtt_client_init(&config);
 
+    if (client_ == nullptr) {
+        return ESP_ERR_NO_MEM;
+    }
+
     const esp_err_t err = esp_mqtt_client_register_event(
         client_,
         MQTT_EVENT_ANY,
@@ -141,9 +145,17 @@ void MqttService::handle_event(std::int32_t event_id, esp_mqtt_event_handle_t ev
 void MqttService::handle_message(std::string_view topic, std::string_view payload) {
     if (topic == "ventilation/command/enable") {
         if (payload == "START") {
-            motor_service_.start();
+            const esp_err_t err = motor_service_.start();
+
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to start motor");
+            }
         } else if (payload == "STOP") {
-            motor_service_.stop();
+            const esp_err_t err = motor_service_.stop();
+
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to stop motor");
+            }
         }
     }
 
@@ -161,7 +173,15 @@ void MqttService::handle_message(std::string_view topic, std::string_view payloa
             return;
         }
 
-        motor_service_.set_speed(rpm);
+        const esp_err_t err = motor_service_.set_speed(rpm);
+
+        if (err != ESP_OK) {
+            ESP_LOGW(
+                TAG,
+                "Failed to set speed: %s",
+                esp_err_to_name(err)
+            );
+        }
     }
 }
 

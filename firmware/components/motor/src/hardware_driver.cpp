@@ -107,7 +107,12 @@ esp_err_t HardwareDriver::set_frequency(std::uint16_t freq_hz) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (freq_hz > applied_freq_hz_ + MAX_FREQ_STEP_HZ) {
+    const std::uint32_t delta =
+        freq_hz > applied_freq_hz_
+            ? freq_hz - applied_freq_hz_
+            : applied_freq_hz_ - freq_hz;
+
+    if (delta > MAX_FREQ_STEP_HZ) {
         return ESP_ERR_INVALID_ARG;
     }
 
