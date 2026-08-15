@@ -40,6 +40,7 @@ private:
 private:
     esp_mqtt_client_handle_t client_{nullptr};
     bool connected_{false};
+    bool started_{false};
 
     motor::MotorService& motor_service_;
 };

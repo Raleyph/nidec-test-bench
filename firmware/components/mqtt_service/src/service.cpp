@@ -9,6 +9,7 @@
 #include "esp_event.h"
 
 #include "mqtt/service.hpp"
+#include "mqtt/config.hpp"
 
 namespace {
 
@@ -18,15 +19,17 @@ constexpr char TAG[] = "mqtt";
 
 namespace mqtt {
 
+using namespace config;
+
 //////////////////////////////////////////////////////////////////////////
 // Public API
 
 esp_err_t MqttService::initialize() {
     esp_mqtt_client_config_t config = {};
 
-    config.broker.address.uri = "";
-    config.credentials.username = "";
-    config.credentials.authentication.password = "";
+    config.broker.address.uri = BROKER_URI;
+    config.credentials.username = USERNAME;
+    config.credentials.authentication.password = PASSWORD;
 
     client_ = esp_mqtt_client_init(&config);
 
@@ -49,11 +52,17 @@ esp_err_t MqttService::start() {
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (started_) {
+        return ESP_OK;
+    }
+
     const esp_err_t err = esp_mqtt_client_start(client_);
 
     if (err != ESP_OK) {
         return err;
     }
+
+    started_ = true;
 
     return ESP_OK;
 }

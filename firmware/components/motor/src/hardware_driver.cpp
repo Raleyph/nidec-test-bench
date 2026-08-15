@@ -13,6 +13,23 @@ namespace motor {
 using namespace config;
 
 esp_err_t HardwareDriver::initialize() {
+    gpio_config_t io_config{};
+
+    io_config.pin_bit_mask = (1ULL << ENABLE_GPIO) | (1ULL << DIRECTION_GPIO);
+    io_config.mode = GPIO_MODE_OUTPUT;
+    io_config.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_config.intr_type = GPIO_INTR_DISABLE;
+
+    esp_err_t err = gpio_config(&io_config);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    ESP_ERROR_CHECK(gpio_set_level(ENABLE_GPIO, 0));
+    ESP_ERROR_CHECK(gpio_set_level(DIRECTION_GPIO, 0));
+
     const ledc_timer_config_t timer_config{
         .speed_mode = LEDC_MODE,
         .duty_resolution = LEDC_TIMER_BIT,
@@ -22,7 +39,7 @@ esp_err_t HardwareDriver::initialize() {
         .deconfigure = false,
     };
 
-    esp_err_t err = ledc_timer_config(&timer_config);
+    err = ledc_timer_config(&timer_config);
 
     if (err != ESP_OK) {
         return err;
