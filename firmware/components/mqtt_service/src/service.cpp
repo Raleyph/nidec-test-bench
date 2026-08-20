@@ -145,12 +145,16 @@ void MqttService::handle_event(std::int32_t event_id, esp_mqtt_event_handle_t ev
 void MqttService::handle_message(std::string_view topic, std::string_view payload) {
     if (topic == "ventilation/command/enable") {
         if (payload == "START") {
+            ESP_LOGI(TAG, "START command received");
+
             const esp_err_t err = motor_service_.start();
 
             if (err != ESP_OK) {
                 ESP_LOGW(TAG, "Failed to start motor");
             }
         } else if (payload == "STOP") {
+            ESP_LOGI(TAG, "STOP command received");
+
             const esp_err_t err = motor_service_.stop();
 
             if (err != ESP_OK) {
@@ -160,6 +164,8 @@ void MqttService::handle_message(std::string_view topic, std::string_view payloa
     }
 
     if (topic == "ventilation/command/speed") {
+        ESP_LOGI(TAG, "SPEED command received");
+
         std::uint16_t rpm{};
 
         const auto [ptr, ec] = std::from_chars(

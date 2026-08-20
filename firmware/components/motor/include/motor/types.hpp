@@ -8,11 +8,6 @@
 
 namespace motor {
 
-enum class Direction {
-    Clockwise,
-    CounterClockwise,
-};
-
 enum class MotorStatus {
     Disabled,
 

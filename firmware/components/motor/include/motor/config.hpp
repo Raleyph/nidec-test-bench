@@ -12,21 +12,21 @@ namespace motor::config
 
 // GPIO
 
-constexpr gpio_num_t ENABLE_GPIO = GPIO_NUM_3;
-constexpr gpio_num_t DIRECTION_GPIO = GPIO_NUM_4;
+constexpr gpio_num_t ENABLE_GPIO = GPIO_NUM_1;
 constexpr gpio_num_t PFM_GPIO = GPIO_NUM_2;
 
 // Motor
 
-constexpr std::uint16_t MIN_RPM = 150;
-constexpr std::uint16_t MAX_RPM = 2'700;
+constexpr std::uint16_t START_FREQ_HZ = 18'000;
 
-constexpr std::uint16_t MIN_FREQ_HZ = 1'000;
-constexpr std::uint16_t MAX_FREQ_HZ = 18'000;
+constexpr std::uint16_t MIN_RPM = 500;
+constexpr std::uint16_t MIN_FREQ_HZ = 3'333;
 
+constexpr std::uint16_t MAX_RPM = 3'000;
+constexpr std::uint16_t MAX_FREQ_HZ = 20'000;
+
+constexpr float FREQ_PER_RPM = static_cast<float>(MAX_FREQ_HZ) / static_cast<float>(MAX_RPM);
 constexpr std::uint16_t MAX_FREQ_STEP_HZ = 100;
-
-constexpr float FREQ_PER_RPM = static_cast<float>(MIN_FREQ_HZ) / static_cast<float>(MIN_RPM);
 
 constexpr std::uint32_t RAMP_STEP_HZ = 100;
 constexpr std::uint32_t RAMP_DELAY_MS = 20;

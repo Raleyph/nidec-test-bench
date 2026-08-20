@@ -1,5 +1,7 @@
 // © 2026 Raleyph
 
+#include "esp_log.h"
+
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 
@@ -8,6 +10,12 @@
 #include "motor/config.hpp"
 #include "motor/driver.hpp"
 
+namespace {
+
+const char TAG[] = "driver";
+
+}
+
 namespace motor {
 
 using namespace config;
@@ -15,8 +23,8 @@ using namespace config;
 esp_err_t HardwareDriver::initialize() {
     gpio_config_t io_config{};
 
-    io_config.pin_bit_mask = (1ULL << ENABLE_GPIO) | (1ULL << DIRECTION_GPIO);
-    io_config.mode = GPIO_MODE_OUTPUT;
+    io_config.pin_bit_mask = (1ULL << ENABLE_GPIO);
+    io_config.mode = GPIO_MODE_OUTPUT_OD;
     io_config.pull_up_en = GPIO_PULLUP_DISABLE;
     io_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_config.intr_type = GPIO_INTR_DISABLE;
@@ -28,7 +36,6 @@ esp_err_t HardwareDriver::initialize() {
     }
 
     ESP_ERROR_CHECK(gpio_set_level(ENABLE_GPIO, 0));
-    ESP_ERROR_CHECK(gpio_set_level(DIRECTION_GPIO, 0));
 
     const ledc_timer_config_t timer_config{
         .speed_mode = LEDC_MODE,
@@ -64,8 +71,6 @@ esp_err_t HardwareDriver::initialize() {
         return err;
     }
 
-    applied_freq_hz_ = MIN_FREQ_HZ;
-
     return ESP_OK;
 }
 
@@ -75,6 +80,12 @@ esp_err_t HardwareDriver::set_enabled(bool enabled) {
     if (err != ESP_OK) {
         return err;
     }
+
+    ESP_LOGI(
+        TAG,
+        "%s",
+        enabled ? "Driver enabled" : "Driver disabled"
+    );
 
     return ESP_OK;
 }
@@ -88,18 +99,11 @@ esp_err_t HardwareDriver::set_pfm_enabled(bool enabled) {
         return err;
     }
 
-    return ledc_update_duty(LEDC_MODE, LEDC_CHANNEL);
-}
-
-esp_err_t HardwareDriver::set_direction(Direction direction) {
-    const std::uint8_t level = direction == Direction::Clockwise ? 0 : 1;
-    const esp_err_t err = gpio_set_level(DIRECTION_GPIO, level);
-
-    if (err != ESP_OK) {
-        return err;
+    if (!enabled) {
+        applied_freq_hz_ = 0;
     }
 
-    return ESP_OK;
+    return ledc_update_duty(LEDC_MODE, LEDC_CHANNEL);
 }
 
 esp_err_t HardwareDriver::set_frequency(std::uint16_t freq_hz) {
@@ -107,13 +111,15 @@ esp_err_t HardwareDriver::set_frequency(std::uint16_t freq_hz) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    const std::uint32_t delta =
-        freq_hz > applied_freq_hz_
-            ? freq_hz - applied_freq_hz_
-            : applied_freq_hz_ - freq_hz;
+    if (applied_freq_hz_ != 0) {
+        const std::uint32_t delta =
+            freq_hz > applied_freq_hz_
+                ? freq_hz - applied_freq_hz_
+                : applied_freq_hz_ - freq_hz;
 
-    if (delta > MAX_FREQ_STEP_HZ) {
-        return ESP_ERR_INVALID_ARG;
+        if (delta > MAX_FREQ_STEP_HZ) {
+            return ESP_ERR_INVALID_ARG;
+        }
     }
 
     const esp_err_t err = ledc_set_freq(LEDC_MODE, LEDC_TIMER, freq_hz);

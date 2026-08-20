@@ -20,7 +20,6 @@ public:
     virtual esp_err_t initialize() = 0;
     virtual esp_err_t set_enabled(bool enabled) = 0;
     virtual esp_err_t set_pfm_enabled(bool enabled) = 0;
-    virtual esp_err_t set_direction(Direction direction) = 0;
     virtual esp_err_t set_frequency(std::uint16_t freq_hz) = 0;
 };
 
@@ -32,7 +31,6 @@ public:
     esp_err_t initialize() override;
     esp_err_t set_enabled(bool enabled) override;
     esp_err_t set_pfm_enabled(bool enabled);
-    esp_err_t set_direction(Direction direction) override;
     esp_err_t set_frequency(std::uint16_t freq_hz);
 
 private:

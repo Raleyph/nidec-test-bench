@@ -2,7 +2,7 @@
 
 namespace wifi::config {
 
-constexpr char SSID[] = "MyWiFi";
-constexpr char PASSWORD[] = "password";
+constexpr char SSID[] = "koilkoilkoil";
+constexpr char PASSWORD[] = "332438611";
 
 }

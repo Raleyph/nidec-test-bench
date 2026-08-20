@@ -68,14 +68,6 @@ esp_err_t MotorService::initialize() {
         return err;
     }
 
-    // setting operational direction
-
-    err = driver_.set_direction(Direction::Clockwise);
-
-    if (err != ESP_OK) {
-        return err;
-    }
-
     state_ = {};
     state_.target_freq_hz = MIN_FREQ_HZ;
     state_.status = MotorStatus::Disabled;
@@ -154,6 +146,13 @@ void MotorService::run() {
 
 void MotorService::enter_fault(const esp_err_t error)
 {
+    ESP_LOGE(
+        TAG,
+        "Entering FAULT: %s (0x%x)",
+        esp_err_to_name(error),
+        error
+    );
+
     const esp_err_t pfm_err = driver_.set_pfm_enabled(false);
     const esp_err_t motor_err = driver_.set_enabled(false);
 
@@ -265,7 +264,11 @@ esp_err_t MotorService::handle_set_speed_command(const std::uint16_t rpm) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (state_.status == MotorStatus::Stopping || state_.status == MotorStatus::Fault) {
+    if (state_.status == MotorStatus::Stopping) {
+        return ESP_OK;
+    }
+
+    if (state_.status == MotorStatus::Fault) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -309,20 +312,18 @@ esp_err_t MotorService::process_state() {
 
 esp_err_t MotorService::process_start() {
 
-    // setting min frequency
+    // setting start frequency
 
-    esp_err_t err = driver_.set_frequency(MIN_FREQ_HZ);
-
+    esp_err_t err = driver_.set_frequency(START_FREQ_HZ);
     if (err != ESP_OK) {
         return err;
     }
 
-    state_.current_freq_hz = MIN_FREQ_HZ;
+    state_.current_freq_hz = START_FREQ_HZ;
 
     // enabling PFM
 
     err = driver_.set_pfm_enabled(true);
-
     if (err != ESP_OK) {
         return err;
     }
@@ -332,17 +333,18 @@ esp_err_t MotorService::process_start() {
     // enabling the motor
 
     err = driver_.set_enabled(true);
-
     if (err != ESP_OK) {
         return err;
     }
 
     state_.motor_enabled = true;
 
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
     // setting state
 
     state_.status =
-        state_.target_freq_hz > MIN_FREQ_HZ
+        state_.current_freq_hz != state_.target_freq_hz
             ? MotorStatus::Ramping
             : MotorStatus::Running;
     
