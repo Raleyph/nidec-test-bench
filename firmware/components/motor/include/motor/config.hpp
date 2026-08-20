@@ -28,7 +28,7 @@ constexpr std::uint16_t MAX_FREQ_HZ = 20'000;
 constexpr float FREQ_PER_RPM = static_cast<float>(MAX_FREQ_HZ) / static_cast<float>(MAX_RPM);
 constexpr std::uint16_t MAX_FREQ_STEP_HZ = 100;
 
-constexpr std::uint32_t RAMP_STEP_HZ = 100;
+constexpr std::uint32_t RAMP_STEP_HZ = 50;
 constexpr std::uint32_t RAMP_DELAY_MS = 20;
 
 // Command Queue
